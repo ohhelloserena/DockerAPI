@@ -1,5 +1,7 @@
-﻿using MongoDB.Driver;
+﻿using Microsoft.VisualBasic;
+using MongoDB.Driver;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -7,19 +9,22 @@ namespace DockerAPI.Services
 {
     public class MongoDbService
     {
-        private IMongoCollection<TreeNode> _TreeNodeCollection { get; set; }
-        private string databaseName = "TradeshiftDatabase";
-        private string collectionName = "start";
-        private string connectionString = "mongodb+srv://tradeshift_user:password_headphones@cluster0-qfjwx.mongodb.net/TradeshiftDatabase? retryWrites =true&w=majority";
+        private IMongoCollection<TreeNode> _treeNodeCollection { get; set; }
+        private string _databaseName = "TradeshiftDatabase";
+        private string _collectionName = "start";
+        private string _connectionString = "mongodb+srv://tradeshift_user:password_headphones@cluster0-qfjwx.mongodb.net/TradeshiftDatabase? retryWrites =true&w=majority";
+        private int _rootId;
+
 
         public MongoDbService()
         {
             try
             {
-                var mongoClient = new MongoClient(connectionString);
-                var mongoDatabase = mongoClient.GetDatabase(databaseName);
+                var mongoClient = new MongoClient(_connectionString);
+                var mongoDatabase = mongoClient.GetDatabase(_databaseName);
 
-                _TreeNodeCollection = mongoDatabase.GetCollection<TreeNode>(collectionName);
+                _treeNodeCollection = mongoDatabase.GetCollection<TreeNode>(_collectionName);
+                _rootId = FindRootId();
             }
             catch (Exception e)
             {
@@ -28,20 +33,31 @@ namespace DockerAPI.Services
 
         }
 
-        public async Task<TreeNode> UpdateParentNodeById(int id, int newParentId)
+        public TreeNode UpdateChildrenById(int id, int[] newChildren)
+        {
+            var updatedNode = _treeNodeCollection.FindOneAndUpdate(
+                   Builders<TreeNode>.Filter.Where(d => d._id == id),
+                   Builders<TreeNode>.Update.Set(d => d.children, newChildren),
+                   options: new FindOneAndUpdateOptions<TreeNode>
+                   {
+                       ReturnDocument = ReturnDocument.After
+                   });
+
+            return updatedNode;
+        }
+
+        public TreeNode UpdateParentNodeById(int id, int newParentId)
         {
             try
             {
-                var updatedNode = await _TreeNodeCollection.FindOneAndUpdateAsync(
+                var updatedNode = _treeNodeCollection.FindOneAndUpdate(
                     Builders<TreeNode>.Filter.Where(d => d._id == id),
                     Builders<TreeNode>.Update.Set(d => d.parent, newParentId),
                     options: new FindOneAndUpdateOptions<TreeNode>
                     {
                         ReturnDocument = ReturnDocument.After
                     });
-                //updatedNode.Height = await GetHeight(id);
-                //updatedNode.Root = await GetRootId(id);
-                
+
                 return updatedNode;
             }
             catch (Exception e)
@@ -52,29 +68,50 @@ namespace DockerAPI.Services
             return null;
         }
 
-        public async Task<TreeNode> GetTreeNodeById(int id)
+        public TreeNode GetTreeNodeById(int? id)
         {
-            var document = await _TreeNodeCollection.FindAsync(d => d._id == id);
+            if (id == null) return null;
+
+            var document = _treeNodeCollection.Find(d => d._id == id);
 
             return document.FirstOrDefault();
         }
 
-        public async Task<int> GetHeight(int id)
+        public int FindDepth(int rootId, int id)
         {
-            return -1;
+            TreeNode rootNode = GetTreeNodeById(rootId);
 
+            if (rootNode._id == id)
+            {
+                return 0;
+            }
+            else if (rootNode.children.Count() == 0)  
+            {
+                return -1;
+            }
+            else
+            {
+                List<int> heights = new List<int>();
 
+                foreach (int childId in rootNode.children)
+                {
+                    heights.Add(FindDepth(childId, id));
+                }
+
+                return heights.Max() + 1;
+            }
         }
 
-        public async Task<int> GetRootId(int id)
+        private int FindRootId()
         {
-            //TreeNode node = await GetTreeNodeById(id);
+            var document = _treeNodeCollection.Find(d => d.parent == null);
 
-            //if (node.parent == null) return node._id;
+            return document.FirstOrDefault()._id;
+        }
 
-            return -1;
-
-           
+        public int GetRoot()
+        {
+            return _rootId;
         }
 
 

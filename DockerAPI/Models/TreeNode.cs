@@ -16,6 +16,6 @@ namespace DockerAPI
 
         public int Root { get; set; }
 
-        public int Height { get; set; }
+        public int Depth { get; set; }
     }
 }

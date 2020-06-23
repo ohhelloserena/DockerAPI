@@ -1,7 +1,9 @@
 ﻿using DockerAPI.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace DockerAPI.Controllers
@@ -11,7 +13,7 @@ namespace DockerAPI.Controllers
     public class TreeNodeController : Controller
     {
         [HttpGet]
-        public async Task<IActionResult> GetDescendents(int id)
+        public IActionResult GetDescendents(int id)
         {
             var mongoDbService = new MongoDbService();
 
@@ -20,7 +22,7 @@ namespace DockerAPI.Controllers
 
             try
             {
-                var node = await mongoDbService.GetTreeNodeById(id);
+                var node = mongoDbService.GetTreeNodeById(id);
 
                 if (node == null)
                 {
@@ -36,16 +38,17 @@ namespace DockerAPI.Controllers
 
                         foreach (int child in curr.children)
                         {
-                            var childNode = await mongoDbService.GetTreeNodeById(child);
+                            var childNode = mongoDbService.GetTreeNodeById(child);
 
                             if (childNode != null)
                             {
                                 queue.Enqueue(childNode);
 
-                                childNode.Height = await mongoDbService.GetHeight(childNode._id);
-                                childNode.Root = await mongoDbService.GetRootId(childNode._id);
+                                
+                                childNode.Root = mongoDbService.GetRoot();
+                                childNode.Depth = mongoDbService.FindDepth(childNode.Root, childNode._id);
 
-                                descendentNodes.Add(node);
+                                descendentNodes.Add(childNode);
                             }
 
                         }
@@ -62,37 +65,36 @@ namespace DockerAPI.Controllers
 
 
         [HttpPatch]
-        public async Task<IActionResult> UpdateParentNode([FromQuery]QueryParameters parameters)
+        public IActionResult UpdateParentNode([FromQuery]QueryParameters parameters)
         {
             try
             {
                 var mongoDbService = new MongoDbService();
 
-                var node = await mongoDbService.GetTreeNodeById(parameters.id);
+                var node = mongoDbService.GetTreeNodeById(parameters.id);
+                var parent = mongoDbService.GetTreeNodeById(parameters.newParentId);
 
-                if (node == null)
+                if (node == null || parent == null)
                 {
-                    return NotFound("id is invalid");
+                    return NotFound("id and/or new parent id are invalid");
                 }
                 else
                 {
-                    int id = parameters.id;
-                    int newParentId = parameters.newParentId;
+                    //update old parent's children
+                    int? oldParentId = node.parent;
 
-                    //var oldParent = await mongoDbService.GetParent(id);
+                    if (oldParentId != null)
+                    {
+                        var parentNode = mongoDbService.GetTreeNodeById(oldParentId);
 
-                    var result = await mongoDbService.UpdateParentNodeById(id, newParentId);
-                    result.Height = await mongoDbService.GetHeight(id);
-                    result.Root = await mongoDbService.GetRootId(id);
-
-
-                    //if (result is ok)
-                    //{
-                    //    var result2 = await mongoDbService.RemoveChild(oldParent, id);
-                    //}
+                        int[] newChildrenList = parentNode.children.Where(c => c != parameters.id).ToArray();
+                        mongoDbService.UpdateChildrenById(oldParentId, newChildrenList);
+                    }
                     
-
-
+                    var result = mongoDbService.UpdateParentNodeById(parameters.id, parameters.newParentId);
+                    result.Root = mongoDbService.GetRoot();
+                    result.Depth = mongoDbService.FindDepth(result.Root, result._id);
+                    
                     return Ok(result);
                 }
 
