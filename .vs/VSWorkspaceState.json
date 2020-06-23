@@ -1,0 +1,11 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\DockerAPI",
+    "\\DockerAPI\\Controllers",
+    "\\DockerAPI\\Properties",
+    "\\DockerAPI\\Services"
+  ],
+  "SelectedNode": "\\DockerAPI\\DockerAPI.csproj",
+  "PreviewInSolutionExplorer": false
+}

@@ -12,7 +12,7 @@ namespace DockerAPI.Services
         private IMongoCollection<TreeNode> _treeNodeCollection { get; set; }
         private string _databaseName = "TradeshiftDatabase";
         private string _collectionName = "start";
-        private string _connectionString = "mongodb+srv://tradeshift_user:password_headphones@cluster0-qfjwx.mongodb.net/TradeshiftDatabase? retryWrites =true&w=majority";
+        private string _connectionString = "mongodb+srv://tradeshift_user:password_headphones@cluster0-qfjwx.mongodb.net/TradeshiftDatabase?retryWrites=true&w=majority";
         private int _rootId;
 
 
@@ -28,12 +28,12 @@ namespace DockerAPI.Services
             }
             catch (Exception e)
             {
-                Console.WriteLine(e);
+                throw e;
             }
 
         }
 
-        public TreeNode UpdateChildrenById(int id, int[] newChildren)
+        public TreeNode UpdateChildrenById(int? id, int[] newChildren)
         {
             var updatedNode = _treeNodeCollection.FindOneAndUpdate(
                    Builders<TreeNode>.Filter.Where(d => d._id == id),
